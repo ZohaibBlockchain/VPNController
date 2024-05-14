@@ -41,6 +41,7 @@ const app = express();
 app.use(bodyParser.json());
 
 
+
 // Start the Server
 const PORT = process.env.PORT || 6500;
 app.listen(PORT, () => {
@@ -49,13 +50,11 @@ app.listen(PORT, () => {
 
 
 
-
 const Limiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
     max: 10, // limit each IP to 10 requests per windowMs
     message: 'Too many attempts from this IP, please try again after 15 minutes.'
 });
-
 
 
 
@@ -91,7 +90,6 @@ app.get('/api/serverlist', async (req, res) => {
 
 
 
-
 app.post('/api/selectedserver', async (req, res) => {
     try {
         const { serverID } = req.body;
@@ -111,14 +109,7 @@ app.post('/api/selectedserver', async (req, res) => {
         const userRef = db.ref('usrData').child(userInfo.uid);
         await userRef.set({ selectedServer: serverID });
 
-
         //Futher send request to other service to add this peer
-
-
-
-
-
-
 
         res.status(200).json({ message: 'Server selected successfully' });
     } catch (error) {
@@ -127,14 +118,6 @@ app.post('/api/selectedserver', async (req, res) => {
     }
 });
 
-
-
-
-
-app.post('/api/addnewserver', (req, res) => {
-    const { endpoint, publickey } = req.body;
-    res.status(201).json(enpoint, publickey);
-});
 
 
 app.post('/api/signup', Limiter, async (req, res) => {
@@ -166,7 +149,7 @@ app.post('/api/signup', Limiter, async (req, res) => {
 
 app.post('/api/login',Limiter, async (req, res) => {
     const { email, password } = req.body;
-    const apiKey = 'aa'; // Replace with your Firebase API key
+    const apiKey = process.env.FB_API_KEY; // Replace with your Firebase API key
     const url = `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${apiKey}`;
 
     console.log(email,password);
@@ -185,7 +168,6 @@ app.post('/api/login',Limiter, async (req, res) => {
         res.status(400).json({ message: 'Authentication failed', error: error });
     }
 });
-
 
 
 
@@ -219,7 +201,6 @@ const checkAdmin = async (req, res, next) => {
         res.status(403).json({ message: 'Invalid token', error: error.message });
     }
 };
-
 
 
 
@@ -259,7 +240,7 @@ app.post('/api/request-reset', checkUserExists, async (req, res) => {
 
         // Send the code via email
         const mailOptions = {
-            from: 'zohaib@flashledger.net',
+            from: process.env.EMAIL,
             to: email,
             subject: 'Your Password Reset Code',
             text: `Your password reset code is: ${code}`
@@ -367,11 +348,6 @@ app.delete('/api/removeServer/:id', checkAdmin, async (req, res) => {
 app.get('/api/protected', checkAuth, (req, res) => {
     res.status(200).json({ message: 'Access to protected data', user: req.user });
 });
-
-
-
-
-
 
 
 
