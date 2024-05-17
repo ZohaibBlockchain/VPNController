@@ -8,6 +8,8 @@ const rateLimit = require('express-rate-limit');
 require('dotenv').config();
 const adminToken = process.env.ADMIN_TOKEN;
 
+// Base URL of the API
+const apiBaseUrl = process.env.ADMIN_TOKEN;
 
 
 var serviceAccount = require("./fb.json");
@@ -42,6 +44,7 @@ app.use(bodyParser.json());
 
 
 
+
 // Start the Server
 const PORT = process.env.PORT || 6500;
 app.listen(PORT, () => {
@@ -71,29 +74,23 @@ app.get('/api/serverlist', async (req, res) => {
     if (!req.headers.authorization || !req.headers.authorization.startsWith('Bearer ')) {
         return res.status(401).json({ message: 'Unauthorized' });
     }
-    const idToken = req.headers.authorization.split('Bearer ')[1];
-    const info = await decodeIdToken(idToken);
-
     const ref = db.ref('serverList');
     // Fetch data once
-    ref.get()
-        .then((snapshot) => {
-            const data = snapshot.val();
-            console.log('data:', data); // Log the retrieved data
-            res.json(data); // Send the retrieved data as JSON response
-        })
-        .catch((error) => {
-            console.error('Error fetching data:', error); // Log any errors
-            res.status(500).send('Error fetching data'); // Send an error response if fetching data fails
-        });
+    try {
+        const _r = await ref.get();
+        res.json(_r.val()); // Send the retrieved data as JSON response
+    } catch (error) {
+        console.error('Error fetching data:', error); // Log any errors
+        res.status(500).send('Error fetching data'); // Send an error response if fetching data fails
+    }
 });
 
 
 
 app.post('/api/selectedserver', async (req, res) => {
     try {
-        const { serverID } = req.body;
-
+        const { serverID, publicKey } = req.body;
+        
         // Check if the authorization header is present and has the correct format
         if (!req.headers.authorization || !req.headers.authorization.startsWith('Bearer ')) {
             return res.status(401).json({ message: 'Unauthorized' });
@@ -105,18 +102,62 @@ app.post('/api/selectedserver', async (req, res) => {
         // Decode the ID token to get user information
         const userInfo = await decodeIdToken(idToken);
 
+        // Remove the previous server
+        const serverlist = db.ref('serverList');
+        const _r = await serverlist.get();
+        const keys = Object.keys(_r.val());
+
+        // Removing the user from other servers
+        await Promise.all(keys.map(async key => {
+            const server = _r.val()[key];
+            const splitString = server.Peer.Endpoint.split(':');
+            const ENDPOINT = splitString[0] + ':14500';
+            const params = {
+                publicKey: publicKey
+            };
+            await axios.post(`http://${ENDPOINT}/api/peer/rm`, params);
+        }));
+
+        const selectedServer = _r.val()[serverID];
+        const splitString = selectedServer.Peer.Endpoint.split(':');
+        const ENDPOINT = splitString[0] + ':14500';
+
         // Set the selected server for the user in the database
+        const myAddress = await axios.get(`http://${ENDPOINT}/api/available-ip`);
         const userRef = db.ref('usrData').child(userInfo.uid);
-        await userRef.set({ selectedServer: serverID });
+        await userRef.set({ myAddress: myAddress.data.availableIP });
 
-        //Futher send request to other service to add this peer
+        const params = {
+            publicKey: publicKey,
+            allowedIPs: myAddress.data.availableIP
+        };
 
-        res.status(200).json({ message: 'Server selected successfully' });
+        const config = {
+            Interface: {
+                Address: myAddress.data.availableIP,
+                DNS: selectedServer.Interface.DNS
+            },
+            Peer: {
+                PublicKey: selectedServer.Peer.publicKey,
+                AllowedIPs: '0.0.0.0/0, ::/0',
+                Endpoint: selectedServer.Peer.Endpoint
+            }
+        };
+
+        const response = await axios.post(`http://${ENDPOINT}/api/peer`, params);
+        console.log(response.data.message);
+        if (response.data.message === 'Peer added.' || response.data.message === 'Peer already exists.') {
+            console.log(response.data.message);
+            res.status(200).json({ message: 'Server selected successfully', config: config });
+        } else {
+            res.status(500).json({ message: 'Error selecting server', response });
+        }
     } catch (error) {
         console.error('Error selecting server:', error);
-        res.status(500).json({ message: 'Error selecting server' });
+        res.status(500).json({ message: 'Error selecting server', error });
     }
 });
+
 
 
 
@@ -147,12 +188,12 @@ app.post('/api/signup', Limiter, async (req, res) => {
 
 
 
-app.post('/api/login',Limiter, async (req, res) => {
+app.post('/api/login', Limiter, async (req, res) => {
     const { email, password } = req.body;
     const apiKey = process.env.FB_API_KEY; // Replace with your Firebase API key
     const url = `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${apiKey}`;
 
-    console.log(email,password);
+    console.log(email, password);
     try {
         const response = await axios.post(url, {
             email,
@@ -247,7 +288,7 @@ app.post('/api/request-reset', checkUserExists, async (req, res) => {
         };
 
         await transporter.sendMail(mailOptions);
-        res.status(200).send('Reset code sent to your email.');
+        res.status(200).send('Password reset request successful. Check your email for the reset code.');
     } catch (error) {
         console.log(error);
         res.status(500).send('Failed to send reset code.');
@@ -287,15 +328,14 @@ app.post('/api/reset-password', async (req, res) => {
 
 app.post('/api/addServer', checkAdmin, async (req, res) => {
     try {
-        const { publicKey, endPoint, myAddress, DNS, name, region, ID } = req.body;
-        if (publicKey && endPoint && myAddress && DNS && name && region && ID) {
+        const { publicKey, endPoint, DNS, name, region, ID } = req.body;
+        if (publicKey && endPoint && DNS && name && region && ID) {
             const config = {
                 Info: {
                     Name: name,
                     Region: region
                 },
                 Interface: {
-                    Address: myAddress,
                     DNS: DNS
                 },
                 Peer: {
@@ -348,8 +388,6 @@ app.delete('/api/removeServer/:id', checkAdmin, async (req, res) => {
 app.get('/api/protected', checkAuth, (req, res) => {
     res.status(200).json({ message: 'Access to protected data', user: req.user });
 });
-
-
 
 
 
