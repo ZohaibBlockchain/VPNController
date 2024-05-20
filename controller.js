@@ -78,7 +78,16 @@ app.get('/api/serverlist', async (req, res) => {
     // Fetch data once
     try {
         const _r = await ref.get();
-        res.json(_r.val()); // Send the retrieved data as JSON response
+
+        // Convert the object to an array
+        const arrayData = Object.keys(_r.val()).map(key => ({
+            ID: key,
+            Name: _r.val()[key].Info.Name,
+            Region: _r.val()[key].Info.Region
+        }));
+
+        console.log(arrayData);
+        res.json(arrayData); // Send the retrieved data as JSON response
     } catch (error) {
         console.error('Error fetching data:', error); // Log any errors
         res.status(500).send('Error fetching data'); // Send an error response if fetching data fails
@@ -90,7 +99,7 @@ app.get('/api/serverlist', async (req, res) => {
 app.post('/api/selectedserver', async (req, res) => {
     try {
         const { serverID, publicKey } = req.body;
-        
+
         // Check if the authorization header is present and has the correct format
         if (!req.headers.authorization || !req.headers.authorization.startsWith('Bearer ')) {
             return res.status(401).json({ message: 'Unauthorized' });
@@ -133,6 +142,10 @@ app.post('/api/selectedserver', async (req, res) => {
         };
 
         const config = {
+            Info: {
+                serverID: serverID,
+                region: selectedServer.Info.Region
+            },
             Interface: {
                 Address: myAddress.data.availableIP,
                 DNS: selectedServer.Interface.DNS
@@ -404,3 +417,13 @@ async function decodeIdToken(idToken) {
         return null;
     }
 }
+
+process.on('uncaughtException', (error) => {
+    console.log('Uncaught Exception:', error.message);
+    // Optionally, restart the service or perform some other logic here
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    console.log('Unhandled Rejection:', reason.message || reason);
+    // Optionally, restart the service or perform some other logic here
+});
