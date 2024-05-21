@@ -121,10 +121,34 @@ app.post('/api/selectedserver', async (req, res) => {
             const server = _r.val()[key];
             const splitString = server.Peer.Endpoint.split(':');
             const ENDPOINT = splitString[0] + ':14500';
-            const params = {
-                publicKey: publicKey
-            };
-            await axios.post(`http://${ENDPOINT}/api/peer/rm`, params);
+
+            const userData = db.ref('usrData').child(userInfo.uid);
+            const _ud = await userData.get();
+
+            if (_ud.val() && 'publicKey' in _ud.val()) {
+                if (publicKey !== _ud.val().publicKey) {
+                    const params = {
+                        publicKey: _ud.val().publicKey
+                    };
+                    await axios.post(`http://${ENDPOINT}/api/peer/rm`, params);//previous public key is removed from server
+                    const userRef = db.ref('usrData').child(userInfo.uid);
+                    await userRef.update({ publicKey: publicKey });//Now here we replaced with new public key
+                } else {
+                    console.log(_ud.val());
+                    const params = {
+                        publicKey: publicKey
+                    };
+                    await axios.post(`http://${ENDPOINT}/api/peer/rm`, params);
+                }
+            } else {
+                //this block will run for the first time user select the server...
+                const params = {
+                    publicKey: publicKey
+                };
+                await axios.post(`http://${ENDPOINT}/api/peer/rm`, params);//previous public key is removed from server
+                const userRef = db.ref('usrData').child(userInfo.uid);
+                await userRef.update({ publicKey: publicKey });
+            }
         }));
 
         const selectedServer = _r.val()[serverID];
@@ -134,7 +158,7 @@ app.post('/api/selectedserver', async (req, res) => {
         // Set the selected server for the user in the database
         const myAddress = await axios.get(`http://${ENDPOINT}/api/available-ip`);
         const userRef = db.ref('usrData').child(userInfo.uid);
-        await userRef.set({ myAddress: myAddress.data.availableIP });
+        await userRef.update({ myAddress: myAddress.data.availableIP });
 
         const params = {
             publicKey: publicKey,
@@ -205,8 +229,6 @@ app.post('/api/login', Limiter, async (req, res) => {
     const { email, password } = req.body;
     const apiKey = process.env.FB_API_KEY; // Replace with your Firebase API key
     const url = `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${apiKey}`;
-
-    console.log(email, password);
     try {
         const response = await axios.post(url, {
             email,
