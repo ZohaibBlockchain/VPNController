@@ -13,6 +13,7 @@ const apiBaseUrl = process.env.ADMIN_TOKEN;
 
 
 var serviceAccount = require("./fb.json");
+const { type } = require('os');
 admin.initializeApp({
     credential: admin.credential.cert(serviceAccount),
     databaseURL: process.env.DATABASE
@@ -332,8 +333,6 @@ app.post('/api/request-reset', checkUserExists, async (req, res) => {
 
 
 
-
-
 app.post('/api/reset-password', async (req, res) => {
     const { email, code, newPassword } = req.body;
     try {
@@ -342,7 +341,9 @@ app.post('/api/reset-password', async (req, res) => {
         const userRef = db.ref('usrData').child(userRecord.uid);
         let inf = await userRef.get();
 
-        if (inf.val().ResetCode !== code) {
+        console.log(inf.val().ResetCode,code,typeof(code),typeof(inf.val().ResetCode));
+
+        if (inf.val().ResetCode.code !== code || (inf.val().ResetCode.expiry + (1000 * (5 * 60))) >= Date.now()) {
             return res.status(400).send({ error: 'Invalid or expired reset code.' });
         }
 
