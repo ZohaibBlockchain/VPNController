@@ -341,9 +341,9 @@ app.post('/api/reset-password', async (req, res) => {
         const userRef = db.ref('usrData').child(userRecord.uid);
         let inf = await userRef.get();
 
-        console.log(inf.val().ResetCode,code,typeof(code),typeof(inf.val().ResetCode));
+        console.log(inf.val().ResetCode,code,typeof(code),typeof(inf.val().ResetCode),Date.now());
 
-        if (inf.val().ResetCode.code !== code || (inf.val().ResetCode.expiry + (1000 * (5 * 60))) >= Date.now()) {
+        if (inf.val().ResetCode.code !== code || (inf.val().ResetCode.expiry + (1000 * (5 * 60))) < Date.now()) {
             return res.status(400).send({ error: 'Invalid or expired reset code.' });
         }
 
