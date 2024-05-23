@@ -63,7 +63,7 @@ const Limiter = rateLimit({
 
 // Routes
 app.get('/', (req, res) => {
-    res.json('This is a SecureScape Controller endpoint');
+    res.json({message:'This is a SecureScape Controller endpoint'});
 });
 
 
@@ -89,8 +89,8 @@ app.get('/api/serverlist', async (req, res) => {
         console.log(arrayData);
         res.json(arrayData); // Send the retrieved data as JSON response
     } catch (error) {
-        console.error('Error fetching data:', error); // Log any errors
-        res.status(500).send('Error fetching data'); // Send an error response if fetching data fails
+        // console.error('Error fetching data:', error); // Log any errors
+        res.status(500).send({message:'Error fetching data'}); // Send an error response if fetching data fails
     }
 });
 
@@ -289,14 +289,13 @@ function generateResetCode() {
 
 const checkUserExists = async (req, res, next) => {
     const { email } = req.body;
-
     try {
         const userRecord = await admin.auth().getUserByEmail(email);
         next(); // Proceed to the next middleware or request handler
     } catch (error) {
         // If the user does not exist, an error will be thrown
         if (error.code === 'auth/invalid-email') {
-            res.status(404).json({ exists: 'User not exits' });
+            res.status(404).json({ message: 'User not exits' });
         } else {
             // Handle other possible errors
             res.status(500).json({ error: error });
@@ -311,8 +310,9 @@ app.post('/api/request-reset', checkUserExists, async (req, res) => {
     const { email } = req.body;
     try {
         const code = generateResetCode();
-        // Store the code in your database with an expiration time
-        // Example: saveCodeForUser(email, code, expirationTime);
+        const userRecord = await admin.auth().getUserByEmail(email);
+        const userRef = db.ref('usrData').child(userRecord.uid);
+        await userRef.update({ ResetCode: { code: code, expiry: Date.now() } });
 
         // Send the code via email
         const mailOptions = {
@@ -323,10 +323,10 @@ app.post('/api/request-reset', checkUserExists, async (req, res) => {
         };
 
         await transporter.sendMail(mailOptions);
-        res.status(200).send('Password reset request successful. Check your email for the reset code.');
+        res.status(200).send({ message: 'Password reset request successful. Check your email for the reset code.' });
     } catch (error) {
         console.log(error);
-        res.status(500).send('Failed to send reset code.');
+        res.status(500).send({message:'Failed to send reset code.'});
     }
 });
 
@@ -337,11 +337,15 @@ app.post('/api/request-reset', checkUserExists, async (req, res) => {
 app.post('/api/reset-password', async (req, res) => {
     const { email, code, newPassword } = req.body;
     try {
-        // Verify the code and check expiration
-        // Example: const isValid = await verifyResetCode(email, code);
-        if (!isValid) {
-            return res.status(400).send('Invalid or expired reset code.');
+
+        const userRecord = await admin.auth().getUserByEmail(email);
+        const userRef = db.ref('usrData').child(userRecord.uid);
+        let inf = await userRef.get();
+
+        if (inf.val().ResetCode !== code) {
+            return res.status(400).send({ error: 'Invalid or expired reset code.' });
         }
+
 
         // Update the password in Firebase Auth
         const user = await admin.auth().getUserByEmail(email);
@@ -351,11 +355,15 @@ app.post('/api/reset-password', async (req, res) => {
 
         // Optionally, invalidate the code after use
         // Example: invalidateCode(email, code);
+        // Remove a specific field
+        await userRef.update({
+            ResetCode: admin.firestore.FieldValue.delete()
+        });
 
-        res.status(200).send('Password has been reset successfully.');
+        res.status(200).send({ message: 'Password has been reset successfully.' });
     } catch (error) {
         console.log(error);
-        res.status(500).send('Failed to reset password.');
+        res.status(500).send({ message: 'Failed to reset password.' });
     }
 });
 
