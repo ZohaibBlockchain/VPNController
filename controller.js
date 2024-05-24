@@ -176,7 +176,7 @@ app.post('/api/selectedserver', async (req, res) => {
                 DNS: selectedServer.Interface.DNS
             },
             Peer: {
-                PublicKey: selectedServer.Peer.publicKey,
+                PublicKey: selectedServer.Peer.PublicKey,
                 AllowedIPs: '0.0.0.0/0, ::/0',
                 Endpoint: selectedServer.Peer.Endpoint
             }
