@@ -64,7 +64,7 @@ const Limiter = rateLimit({
 
 // Routes
 app.get('/', (req, res) => {
-    res.json({message:'This is a SecureScape Controller endpoint'});
+    res.json({ message: 'This is a SecureScape Controller endpoint' });
 });
 
 
@@ -91,7 +91,7 @@ app.get('/api/serverlist', async (req, res) => {
         res.json(arrayData); // Send the retrieved data as JSON response
     } catch (error) {
         // console.error('Error fetching data:', error); // Log any errors
-        res.status(500).send({message:'Error fetching data'}); // Send an error response if fetching data fails
+        res.status(500).send({ message: 'Error fetching data' }); // Send an error response if fetching data fails
     }
 });
 
@@ -196,6 +196,42 @@ app.post('/api/selectedserver', async (req, res) => {
     }
 });
 
+
+
+app.post('/api/deactivate', Limiter, async (req, res) => {
+    const { password } = req.body;
+
+    // Check if the authorization header is present and has the correct format
+    if (!req.headers.authorization || !req.headers.authorization.startsWith('Bearer ')) {
+        return res.status(401).json({ message: 'Unauthorized' });
+    }
+
+    // Extract the ID token from the authorization header
+    const idToken = req.headers.authorization.split('Bearer ')[1];
+
+    try {
+        // Decode the ID token to get user information
+        const decodedToken = await admin.auth().verifyIdToken(idToken);
+        const uid = decodedToken.uid;
+
+        // Get the user's email
+        const user = await admin.auth().getUser(uid);
+        const email = user.email;
+
+        // Sign in with email and password using Firebase Client SDK
+        const userCredential = await firebase.auth().signInWithEmailAndPassword(email, password);
+        
+        // Re-authentication successful, proceed to deactivate the user
+        await admin.auth().updateUser(uid, {
+            disabled: true
+        });
+
+        res.status(200).json({ message: 'User deactivated successfully' });
+    } catch (error) {
+        console.error('Error deactivating user:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
 
 
 
@@ -327,7 +363,7 @@ app.post('/api/request-reset', checkUserExists, async (req, res) => {
         res.status(200).send({ message: 'Password reset request successful. Check your email for the reset code.' });
     } catch (error) {
         console.log(error);
-        res.status(500).send({message:'Failed to send reset code.'});
+        res.status(500).send({ message: 'Failed to send reset code.' });
     }
 });
 
@@ -341,7 +377,7 @@ app.post('/api/reset-password', async (req, res) => {
         const userRef = db.ref('usrData').child(userRecord.uid);
         let inf = await userRef.get();
 
-        console.log(inf.val().ResetCode,code,typeof(code),typeof(inf.val().ResetCode),Date.now());
+        console.log(inf.val().ResetCode, code, typeof (code), typeof (inf.val().ResetCode), Date.now());
 
         if (inf.val().ResetCode.code !== code || (inf.val().ResetCode.expiry + (1000 * (5 * 60))) < Date.now()) {
             return res.status(400).send({ error: 'Invalid or expired reset code.' });
