@@ -35,7 +35,19 @@ const transporter = nodemailer.createTransport({
     }
 });
 
-
+const checkAuth = async (req, res, next) => {
+    if (!req.headers.authorization || !req.headers.authorization.startsWith('Bearer ')) {
+        return res.status(401).json({ message: 'Unauthorized' });
+    }
+    const idToken = req.headers.authorization.split('Bearer ')[1];
+    try {
+        const decodedToken = await admin.auth().verifyIdToken(idToken);
+        req.user = decodedToken; // Attach user info to the request
+        next(); // Proceed to the next middleware or request handler
+    } catch (error) {
+        res.status(403).json({ message: 'Invalid token' });
+    }
+};
 
 // Create Express App
 const app = express();
@@ -63,9 +75,9 @@ const Limiter = rateLimit({
     max: 100, // Limit each IP to 100 requests per `window` (here, per 15 minutes)
     standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
     legacyHeaders: false, // Disable the `X-RateLimit-*` headers
-  });
+});
 
-  app.use(Limiter);
+app.use(Limiter);
 
 
 // Routes
@@ -76,11 +88,8 @@ app.get('/', (req, res) => {
 
 
 // Routes
-app.get('/api/serverlist', async (req, res) => {
+app.get('/api/serverlist', checkAuth, async (req, res) => {
 
-    if (!req.headers.authorization || !req.headers.authorization.startsWith('Bearer ')) {
-        return res.status(401).json({ message: 'Unauthorized' });
-    }
     const ref = db.ref('serverList');
     // Fetch data once
     try {
@@ -103,14 +112,20 @@ app.get('/api/serverlist', async (req, res) => {
 
 
 
-app.post('/api/selectedserver', async (req, res) => {
+
+app.get('/api/refresh', checkAuth, async (req, res) => {
+    try {
+        res.status(200).send({ message: 'ValidToken' }); // Send an error response if fetching data fails
+    } catch (error) {
+        // console.error('Error fetching data:', error); // Log any errors
+        res.status(500).send({ message: 'InValidToken' }); // Send an error response if fetching data fails
+    }
+});
+
+
+app.post('/api/selectedserver', checkAuth, async (req, res) => {
     try {
         const { serverID, publicKey } = req.body;
-
-        // Check if the authorization header is present and has the correct format
-        if (!req.headers.authorization || !req.headers.authorization.startsWith('Bearer ')) {
-            return res.status(401).json({ message: 'Unauthorized' });
-        }
 
         // Extract the ID token from the authorization header
         const idToken = req.headers.authorization.split('Bearer ')[1];
@@ -204,12 +219,8 @@ app.post('/api/selectedserver', async (req, res) => {
 
 
 
-app.post('/api/deactivate', async (req, res) => {
+app.post('/api/deactivate', checkAuth, async (req, res) => {
 
-    // Check if the authorization header is present and has the correct format
-    if (!req.headers.authorization || !req.headers.authorization.startsWith('Bearer ')) {
-        return res.status(401).json({ message: 'Unauthorized' });
-    }
 
     // Extract the ID token from the authorization header
     const idToken = req.headers.authorization.split('Bearer ')[1];
@@ -289,19 +300,7 @@ app.post('/api/login', Limiter, async (req, res) => {
 
 
 
-const checkAuth = async (req, res, next) => {
-    if (!req.headers.authorization || !req.headers.authorization.startsWith('Bearer ')) {
-        return res.status(401).json({ message: 'Unauthorized' });
-    }
-    const idToken = req.headers.authorization.split('Bearer ')[1];
-    try {
-        const decodedToken = await admin.auth().verifyIdToken(idToken);
-        req.user = decodedToken; // Attach user info to the request
-        next(); // Proceed to the next middleware or request handler
-    } catch (error) {
-        res.status(403).json({ message: 'Invalid token', error: error.message });
-    }
-};
+
 
 
 const checkAdmin = async (req, res, next) => {
@@ -499,3 +498,11 @@ process.on('unhandledRejection', (reason, promise) => {
     console.log('Unhandled Rejection:', reason.message || reason);
     // Optionally, restart the service or perform some other logic here
 });
+
+
+
+
+
+
+
+
