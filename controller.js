@@ -44,7 +44,8 @@ const app = express();
 app.use(bodyParser.json());
 
 
-
+// Trust the first proxy
+app.set('trust proxy', 1);
 
 // Start the Server
 const PORT = process.env.PORT || 6500;
