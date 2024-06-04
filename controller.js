@@ -219,10 +219,10 @@ app.post('/api/deactivate', Limiter, async (req, res) => {
         const email = user.email;
 
         // Sign in with email and password using Firebase Client SDK
-        const userCredential = await firebase.auth().signInWithEmailAndPassword(email, password);
+        const userCredential = await admin.auth().getUserByEmail(email);
         
         // Re-authentication successful, proceed to deactivate the user
-        await admin.auth().updateUser(uid, {
+        await admin.auth().updateUser(userCredential.uid, {
             disabled: true
         });
 
