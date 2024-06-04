@@ -199,7 +199,7 @@ app.post('/api/selectedserver', async (req, res) => {
 
 
 app.post('/api/deactivate', Limiter, async (req, res) => {
-    
+
     // Check if the authorization header is present and has the correct format
     if (!req.headers.authorization || !req.headers.authorization.startsWith('Bearer ')) {
         return res.status(401).json({ message: 'Unauthorized' });
@@ -219,10 +219,6 @@ app.post('/api/deactivate', Limiter, async (req, res) => {
 
         // Sign in with email and password using Firebase Client SDK
         const userCredential = await admin.auth().getUserByEmail(email);
-       
-        console.log(userCredential ,hashedPassword);
-
-
 
         // Re-authentication successful, proceed to deactivate the user
         await admin.auth().updateUser(userCredential.uid, {
