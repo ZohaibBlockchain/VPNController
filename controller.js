@@ -115,10 +115,10 @@ app.get('/api/serverlist', checkAuth, async (req, res) => {
 
 app.get('/api/refresh', checkAuth, async (req, res) => {
     try {
-        res.status(200).send({ message: 'ValidToken' }); // Send an error response if fetching data fails
+        res.status(200).send({ message: true }); // Send an error response if fetching data fails
     } catch (error) {
         // console.error('Error fetching data:', error); // Log any errors
-        res.status(500).send({ message: 'InValidToken' }); // Send an error response if fetching data fails
+        res.status(500).send({ message: false }); // Send an error response if fetching data fails
     }
 });
 
