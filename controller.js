@@ -118,7 +118,7 @@ app.get('/api/refresh', checkAuth, async (req, res) => {
         res.status(200).send({ message: 'ValidToken' }); // Send an error response if fetching data fails
     } catch (error) {
         // console.error('Error fetching data:', error); // Log any errors
-        res.status(500).send({ message: 'InValidToken'}); // Send an error response if fetching data fails
+        res.status(500).send({ message: 'InValidToken' }); // Send an error response if fetching data fails
     }
 });
 
@@ -126,6 +126,10 @@ app.get('/api/refresh', checkAuth, async (req, res) => {
 app.post('/api/selectedserver', checkAuth, async (req, res) => {
     try {
         const { serverID, publicKey } = req.body;
+
+        if (publicKey === '') {
+            res.status(500).json({ message: 'Public key is empty' });
+        }
 
         // Extract the ID token from the authorization header
         const idToken = req.headers.authorization.split('Bearer ')[1];
