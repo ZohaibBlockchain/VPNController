@@ -127,8 +127,8 @@ app.post('/api/selectedserver', checkAuth, async (req, res) => {
     try {
         const { serverID, publicKey } = req.body;
 
-        if (publicKey === '') {
-            res.status(500).json({ message: 'Public key is empty' });
+        if (!publicKey) {
+            return res.status(HTTP_STATUS_INTERNAL_SERVER_ERROR).json({ message: 'Public key is empty' });
         }
 
         // Extract the ID token from the authorization header
